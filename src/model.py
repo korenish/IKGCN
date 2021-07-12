@@ -1,6 +1,6 @@
-import tensorflow as tf
 from aggregators import SumAggregator, ConcatAggregator, NeighborAggregator
 from sklearn.metrics import f1_score, roc_auc_score
+import tensorflow as tf
 
 
 class KGCN(object):
@@ -12,7 +12,7 @@ class KGCN(object):
 
     @staticmethod
     def get_initializer():
-        return tf.contrib.layers.xavier_initializer()
+        return tf.keras.initializers.glorot_uniform()
 
     def _parse_args(self, args, adj_entity, adj_relation):
         # [entity_num, neighbor_sample_size]
@@ -35,16 +35,16 @@ class KGCN(object):
             raise Exception("Unknown aggregator: " + args.aggregator)
 
     def _build_inputs(self):
-        self.user_indices = tf.placeholder(dtype=tf.int64, shape=[None], name='user_indices')
-        self.item_indices = tf.placeholder(dtype=tf.int64, shape=[None], name='item_indices')
-        self.labels = tf.placeholder(dtype=tf.float32, shape=[None], name='labels')
+        self.user_indices = tf.compat.v1.placeholder(dtype=tf.int64, shape=[None], name='user_indices')
+        self.item_indices = tf.compat.v1.placeholder(dtype=tf.int64, shape=[None], name='item_indices')
+        self.labels = tf.compat.v1.placeholder(dtype=tf.float32, shape=[None], name='labels')
 
     def _build_model(self, n_user, n_entity, n_relation):
-        self.user_emb_matrix = tf.get_variable(
+        self.user_emb_matrix = tf.compat.v1.get_variable(
             shape=[n_user, self.dim], initializer=KGCN.get_initializer(), name='user_emb_matrix')
-        self.entity_emb_matrix = tf.get_variable(
+        self.entity_emb_matrix = tf.compat.v1.get_variable(
             shape=[n_entity, self.dim], initializer=KGCN.get_initializer(), name='entity_emb_matrix')
-        self.relation_emb_matrix = tf.get_variable(
+        self.relation_emb_matrix = tf.compat.v1.get_variable(
             shape=[n_relation, self.dim], initializer=KGCN.get_initializer(), name='relation_emb_matrix')
 
         # [batch_size, dim]
@@ -109,7 +109,7 @@ class KGCN(object):
             self.l2_loss = self.l2_loss + tf.nn.l2_loss(aggregator.weights)
         self.loss = self.base_loss + self.l2_weight * self.l2_loss
 
-        self.optimizer = tf.train.AdamOptimizer(self.lr).minimize(self.loss)
+        self.optimizer = tf.compat.v1.train.AdamOptimizer(self.lr).minimize(self.loss)
 
     def train(self, sess, feed_dict):
         return sess.run([self.optimizer, self.loss], feed_dict)

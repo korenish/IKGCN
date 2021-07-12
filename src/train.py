@@ -1,6 +1,6 @@
 import tensorflow as tf
-import numpy as np
 from model import KGCN
+import numpy as np
 
 
 def train(args, data, show_loss, show_topk):
@@ -13,8 +13,13 @@ def train(args, data, show_loss, show_topk):
     # top-K evaluation settings
     user_list, train_record, test_record, item_set, k_list = topk_settings(show_topk, train_data, test_data, n_item)
 
-    with tf.Session() as sess:
-        sess.run(tf.global_variables_initializer())
+    # Compare epoch results to save the best ones
+    best_scores = [0, 0, 0, 0]
+    best_results = ["", "", "", "", ""]
+    save_best = 0
+
+    with tf.compat.v1.Session() as sess:
+        sess.run(tf.compat.v1.global_variables_initializer())
 
         for step in range(args.n_epochs):
             # training
@@ -39,14 +44,77 @@ def train(args, data, show_loss, show_topk):
             if show_topk:
                 precision, recall = topk_eval(
                     sess, model, user_list, train_record, test_record, item_set, k_list, args.batch_size)
+                precision_str = ""
                 print('precision: ', end='')
                 for i in precision:
-                    print('%.4f\t' % i, end='')
+                    curr_prec = str(i)[:6]
+                    precision_str += ', ' + curr_prec
+                    print(f"{curr_prec}  ", end='')
+                precision_str = precision_str[2:]
                 print()
                 print('recall: ', end='')
+                recall_str = ""
                 for i in recall:
-                    print('%.4f\t' % i, end='')
+                    curr_rec = str(i)[:6]
+                    recall_str += ', ' + curr_rec
+                    print(f"{curr_rec}  ", end='')
+                recall_str = recall_str[2:]
                 print('\n')
+
+                # Update curr_score by last recall value
+                recall_score = recall[-1]
+                curr_scores = [eval_auc, eval_f1, (eval_auc + eval_f1) / 2, recall_score]
+
+            # Check only for tuning purposes
+            if curr_scores[2] > save_best:
+                save_best = curr_scores[2]
+
+            # Update best results epoch and best scores
+            for k in range(len(best_scores)):
+                if curr_scores[k] > best_scores[k]:
+                    best_scores[k] = curr_scores[k]
+                    best_results[k] = f"test AUC: {test_auc}\n" \
+                                      f"test F1: {test_f1}\n" \
+                                      f"Precision: {precision_str}\n" \
+                                      f"Recall: {recall_str}\n" \
+                                      f"Epoch: {step}\n"
+            # Save also the 10th epoch results
+            if step == 9:
+                best_results[-1] = f"test AUC: {test_auc}\n" \
+                                   f"test F1: {test_f1}\n" \
+                                   f"Precision: {precision_str}\n" \
+                                   f"Recall: {recall_str}\n" \
+                                   f"Epoch: {step}\n"
+        sess.close()
+    if args.Hyperparameter:
+        # Write model results to file
+        file_name = f"dim_{args.dim}.txt"
+        file_path = f'/home/korenish/Recsys_project/Results/Hyperparameter/{args.dataset}/{file_name}'
+        f = open(file_path, "w")
+        for k in range(len(best_results)):
+            f.write(best_results[k])
+            f.write('\n')
+        f.close()
+    else:
+        if not args.tuning:
+            # Write model results to file
+            file_name = f"Test_{args.Test}_{args.aggregator}_aggregator.txt"
+            file_path = f'/home/korenish/Recsys_project/Results/{args.method}/{args.dataset}/{file_name}'
+            f = open(file_path, "w")
+            for k in range(len(best_results)):
+                f.write(best_results[k])
+                f.write('\n')
+            f.close()
+        else:
+            # Write tuned model results to file
+            file_name = f"Test_{args.Test}.txt"
+            file_path = f'/home/korenish/Recsys_project/Results/tuning/{args.dataset}/{file_name}'
+            f = open(file_path, "w")
+            for k in range(len(best_results)):
+                f.write(best_results[k])
+                f.write('\n')
+            f.close()
+            return save_best
 
 
 def topk_settings(show_topk, train_data, test_data, n_item):

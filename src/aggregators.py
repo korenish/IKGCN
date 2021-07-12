@@ -1,7 +1,10 @@
-import tensorflow as tf
 from abc import abstractmethod
+import tensorflow as tf
+
 
 LAYER_IDS = {}
+# seeder_1 = 24
+# seeder_2 = 24
 
 
 def get_layer_id(layer_name=''):
@@ -45,7 +48,7 @@ class Aggregator(object):
 
             # [batch_size, -1, n_neighbor]
             user_relation_scores = tf.reduce_mean(user_embeddings * neighbor_relations, axis=-1)
-            user_relation_scores_normalized = tf.nn.softmax(user_relation_scores, dim=-1)
+            user_relation_scores_normalized = tf.compat.v1.nn.softmax(user_relation_scores, axis=-1)
 
             # [batch_size, -1, n_neighbor, 1]
             user_relation_scores_normalized = tf.expand_dims(user_relation_scores_normalized, axis=-1)
@@ -63,10 +66,11 @@ class SumAggregator(Aggregator):
     def __init__(self, batch_size, dim, dropout=0., act=tf.nn.relu, name=None):
         super(SumAggregator, self).__init__(batch_size, dim, dropout, act, name)
 
-        with tf.variable_scope(self.name):
-            self.weights = tf.get_variable(
-                shape=[self.dim, self.dim], initializer=tf.contrib.layers.xavier_initializer(), name='weights')
-            self.bias = tf.get_variable(shape=[self.dim], initializer=tf.zeros_initializer(), name='bias')
+        with tf.compat.v1.variable_scope(self.name):
+            self.weights = tf.compat.v1.get_variable(
+                shape=[self.dim, self.dim],
+                initializer=tf.compat.v1.keras.initializers.glorot_normal(), name='weights')
+            self.bias = tf.compat.v1.get_variable(shape=[self.dim], initializer=tf.zeros_initializer(), name='bias')
 
     def _call(self, self_vectors, neighbor_vectors, neighbor_relations, user_embeddings):
         # [batch_size, -1, dim]
@@ -74,7 +78,7 @@ class SumAggregator(Aggregator):
 
         # [-1, dim]
         output = tf.reshape(self_vectors + neighbors_agg, [-1, self.dim])
-        output = tf.nn.dropout(output, keep_prob=1-self.dropout)
+        output = tf.compat.v1.nn.dropout(output, rate=self.dropout)
         output = tf.matmul(output, self.weights) + self.bias
 
         # [batch_size, -1, dim]
@@ -87,10 +91,11 @@ class ConcatAggregator(Aggregator):
     def __init__(self, batch_size, dim, dropout=0., act=tf.nn.relu, name=None):
         super(ConcatAggregator, self).__init__(batch_size, dim, dropout, act, name)
 
-        with tf.variable_scope(self.name):
-            self.weights = tf.get_variable(
-                shape=[self.dim * 2, self.dim], initializer=tf.contrib.layers.xavier_initializer(), name='weights')
-            self.bias = tf.get_variable(shape=[self.dim], initializer=tf.zeros_initializer(), name='bias')
+        with tf.compat.v1.variable_scope(self.name):
+            self.weights = tf.compat.v1.get_variable(
+                shape=[self.dim * 2, self.dim],
+                initializer=tf.compat.v1.keras.initializers.glorot_normal(), name='weights')
+            self.bias = tf.compat.v1.get_variable(shape=[self.dim], initializer=tf.zeros_initializer(), name='bias')
 
     def _call(self, self_vectors, neighbor_vectors, neighbor_relations, user_embeddings):
         # [batch_size, -1, dim]
@@ -101,7 +106,7 @@ class ConcatAggregator(Aggregator):
 
         # [-1, dim * 2]
         output = tf.reshape(output, [-1, self.dim * 2])
-        output = tf.nn.dropout(output, keep_prob=1-self.dropout)
+        output = tf.nn.dropout(output, rate=self.dropout)
 
         # [-1, dim]
         output = tf.matmul(output, self.weights) + self.bias
@@ -116,10 +121,11 @@ class NeighborAggregator(Aggregator):
     def __init__(self, batch_size, dim, dropout=0., act=tf.nn.relu, name=None):
         super(NeighborAggregator, self).__init__(batch_size, dim, dropout, act, name)
 
-        with tf.variable_scope(self.name):
-            self.weights = tf.get_variable(
-                shape=[self.dim, self.dim], initializer=tf.contrib.layers.xavier_initializer(), name='weights')
-            self.bias = tf.get_variable(shape=[self.dim], initializer=tf.zeros_initializer(), name='bias')
+        with tf.compat.v1.variable_scope(self.name):
+            self.weights = tf.compat.v1.get_variable(
+                shape=[self.dim, self.dim],
+                initializer=tf.compat.v1.keras.initializers.glorot_normal(), name='weights')
+            self.bias = tf.compat.v1.get_variable(shape=[self.dim], initializer=tf.zeros_initializer(), name='bias')
 
     def _call(self, self_vectors, neighbor_vectors, neighbor_relations, user_embeddings):
         # [batch_size, -1, dim]
@@ -127,7 +133,7 @@ class NeighborAggregator(Aggregator):
 
         # [-1, dim]
         output = tf.reshape(neighbors_agg, [-1, self.dim])
-        output = tf.nn.dropout(output, keep_prob=1-self.dropout)
+        output = tf.nn.dropout(output, rate=self.dropout)
         output = tf.matmul(output, self.weights) + self.bias
 
         # [batch_size, -1, dim]
